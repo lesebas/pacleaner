@@ -111,7 +111,7 @@ class InstalledPkgList(PkgList):
     def __init__(self, path):
         self.path = path
         self.pkg_list = []
-        pkgs = os.listdir(path)
+        pkgs = [ p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p)) ]
         for p in pkgs:
             filepath = os.path.join(path, p, "desc")
             with open(filepath) as f:
@@ -198,6 +198,7 @@ if __name__ == "__main__":
             print_packages(uninstalled)
         if args.morethan:
             print_packages(old)
+
     else:
         if args.uninstalled:
             remove_packages(uninstalled)
