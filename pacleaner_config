@@ -1,0 +1,6 @@
+[DEFAULT]
+
+Installed_Path = /var/lib/pacman/local
+Cache_Path = /var/cache/pacman/pkg/
+Nb_Of_Pkg_Keep = 2
+Delete_Confirmation = Yes
