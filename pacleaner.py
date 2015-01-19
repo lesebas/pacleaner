@@ -7,11 +7,11 @@ import configparser
 from operator import attrgetter
 
 config = configparser.ConfigParser()
-if os.path.isfile(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config')):
-  config.read(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config'))
+#if os.path.isfile(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config')):
+#  config.read(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config'))
 
-else:
-  config.read('pacleaner_config')
+#else:
+  config.read('/usr/share/pacleaner/pacleaner_config')
 
 PACKAGES = config['DEFAULT']['Cache_Path']
 INSTALLED = config['DEFAULT']['Installed_Path']

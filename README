@@ -24,6 +24,4 @@ optional arguments:
   --installed_path PATH, -i PATH
                         optional path to pacman's installed package db
 
-A default config file "pacleaner_config" is required in the directory where the script is stored.
-A local config file can be set as "~/.config/pacleaner/pacleaner_config".
-If both are presnt, the local config file will be used first.
+A default config file "pacleaner_config" is required in the directory /usr/share/paclaner/
