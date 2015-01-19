@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import errno
 import argparse
 import configparser
 from operator import attrgetter
 
 config = configparser.ConfigParser()
-#if os.path.isfile(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config')):
-#  config.read(os.path.join(os.path.expanduser('~'), '.config/pacleaner/pacleaner_config'))
 
-#else:
-  config.read('/usr/share/pacleaner/pacleaner_config')
-
-PACKAGES = config['DEFAULT']['Cache_Path']
+username = os.getenv("SUDO_USER")
+if username is None:
+   username = os.getenv("USER")
+   	
+config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
+try:
+  PACKAGES = config['DEFAULT']['Cache_Path']
+except KeyError:
+  config.read(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'pacleaner_config'))
+  PACKAGES = config['DEFAULT']['Cache_Path']
+   
 INSTALLED = config['DEFAULT']['Installed_Path']
 NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
 SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
