@@ -6,6 +6,7 @@ import errno
 import argparse
 import configparser
 from operator import attrgetter
+import subprocess
 
 config = configparser.ConfigParser()
 
@@ -30,7 +31,7 @@ class Package(object):
     '''base class for all kinds of packages, installed or package files'''
 
     def __str__(self):
-        return self.name + "-" + self.version + "-" + self.pkg_version
+        return self.name + "-" + self.version + "-" + str (self.pkg_version)
     
     def __repr__(self):
         return repr((self.name, self.version, self.pkg_version, self.arch))
@@ -68,7 +69,8 @@ class PkgFile(Package):
     def __init__(self, filename, path):
         self.filename = filename
         self.fullpath = os.path.join(path, filename)
-        self.name, self.version, self.pkg_version, rest = filename.rsplit('-', 3)
+        self.name, self.version, pkg_ver, rest = filename.rsplit('-', 3)
+        self.pkg_version = float (pkg_ver)
         self.arch, self.file_ext = rest.split('.',1)
 
 class InstalledPkg(Package):
@@ -94,6 +96,18 @@ class PkgList(object):
     def sort(self):
         self.pkg_list = sorted(self.pkg_list, key = attrgetter("name", "version", "pkg_version"))
 
+    def sort_by_ver(self):
+        self.pkg_list = sorted(self.pkg_list, key = attrgetter("name"))
+        for i in range(len(self.pkg_list)-2):
+           j = i+1 	   
+           while self.pkg_list[j].name == self.pkg_list[i].name:
+               compare_code = subprocess.check_output(['vercmp' , self.pkg_list[j].fullpath , self.pkg_list[i].fullpath])
+               if int(compare_code)<0 :
+                  current_pkg = self.pkg_list[i]
+                  self.pkg_list[i] = self.pkg_list[j]
+                  self.pkg_list[j] = current_pkg
+               j = j+1
+          
     def names(self):
         return [i.name for i in self.pkg_list ]
 
@@ -144,14 +158,20 @@ def uninstalled_packages(pkgfiles, installed):
 
 def older_than(pkgfiles, installed, number):
     result = []
+    #pkgfiles.sort_by_ver()
     for pkg in installed.unique():
         full_list = pkgfiles.get_by_name(pkg)
         if(len(full_list) > number):
-            full_list = sorted(full_list, key = attrgetter("name", "version",
-"pkg_version"))
-            #print(full_list)
             if len(full_list[0:-number]) > 0:
-                #result.append(full_list[0:-number])
+                for i in range(len(full_list)-1):
+                    j = i+1 	   
+                    while j < len(full_list):
+                        compare_code = subprocess.check_output(['vercmp' , full_list[j].fullpath , full_list[i].fullpath])
+                        if int(compare_code)<0 :
+                            current_pkg = full_list[i]
+                            full_list[i] = full_list[j]
+                            full_list[j] = current_pkg
+                        j = j+1
                 for pkg in full_list[0:-number]:
                     result.append(pkg)
     return result
