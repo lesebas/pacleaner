@@ -1,22 +1,37 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import errno
 import argparse
+import configparser
 from operator import attrgetter
+import subprocess
 
-PACKAGES = "/var/cache/pacman/pkg/"
-INSTALLED = "/var/lib/pacman/local"
+config = configparser.ConfigParser()
+
+username = os.getenv("SUDO_USER")
+if username is None:
+   username = os.getenv("USER")
+   	
+config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
+try:
+  PACKAGES = config['DEFAULT']['Cache_Path']
+except KeyError:
+  config.read(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'pacleaner_config'))
+  PACKAGES = config['DEFAULT']['Cache_Path']
+   
+INSTALLED = config['DEFAULT']['Installed_Path']
+NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
+SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
 EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip"]
 ARCHES = ["any", "x86_64", "i686"]
-NR_OF_PKG = 2
-
 
 class Package(object):
     '''base class for all kinds of packages, installed or package files'''
 
     def __str__(self):
-        return self.name + "-" + self.version + "-" + self.pkg_version
+        return self.name + "-" + self.version + "-" + str (self.pkg_version)
     
     def __repr__(self):
         return repr((self.name, self.version, self.pkg_version, self.arch))
@@ -54,7 +69,8 @@ class PkgFile(Package):
     def __init__(self, filename, path):
         self.filename = filename
         self.fullpath = os.path.join(path, filename)
-        self.name, self.version, self.pkg_version, rest = filename.rsplit('-', 3)
+        self.name, self.version, pkg_ver, rest = filename.rsplit('-', 3)
+        self.pkg_version = float (pkg_ver)
         self.arch, self.file_ext = rest.split('.',1)
 
 class InstalledPkg(Package):
@@ -80,6 +96,18 @@ class PkgList(object):
     def sort(self):
         self.pkg_list = sorted(self.pkg_list, key = attrgetter("name", "version", "pkg_version"))
 
+    def sort_by_ver(self):
+        self.pkg_list = sorted(self.pkg_list, key = attrgetter("name"))
+        for i in range(len(self.pkg_list)-2):
+           j = i+1 	   
+           while self.pkg_list[j].name == self.pkg_list[i].name:
+               compare_code = subprocess.check_output(['vercmp' , self.pkg_list[j].fullpath , self.pkg_list[i].fullpath])
+               if int(compare_code)<0 :
+                  current_pkg = self.pkg_list[i]
+                  self.pkg_list[i] = self.pkg_list[j]
+                  self.pkg_list[j] = current_pkg
+               j = j+1
+          
     def names(self):
         return [i.name for i in self.pkg_list ]
 
@@ -130,14 +158,20 @@ def uninstalled_packages(pkgfiles, installed):
 
 def older_than(pkgfiles, installed, number):
     result = []
+    #pkgfiles.sort_by_ver()
     for pkg in installed.unique():
         full_list = pkgfiles.get_by_name(pkg)
         if(len(full_list) > number):
-            full_list = sorted(full_list, key = attrgetter("name", "version",
-"pkg_version"))
-            #print(full_list)
             if len(full_list[0:-number]) > 0:
-                #result.append(full_list[0:-number])
+                for i in range(len(full_list)-1):
+                    j = i+1 	   
+                    while j < len(full_list):
+                        compare_code = subprocess.check_output(['vercmp' , full_list[j].fullpath , full_list[i].fullpath])
+                        if int(compare_code)<0 :
+                            current_pkg = full_list[i]
+                            full_list[i] = full_list[j]
+                            full_list[j] = current_pkg
+                        j = j+1
                 for pkg in full_list[0:-number]:
                     result.append(pkg)
     return result
@@ -159,7 +193,18 @@ def print_installed(packages):
         for pkg in pkglist:
             print(pkg)
 
-def remove_packages(packages):
+def remove_packages(packages, confirmation):
+    if (not(SECURE_DELETE) or confirmation):
+      answer = "Y"
+      
+    else:
+      print_packages(packages)
+      answer = input ("Are you sure you want to clean-up the pacman cache directory according the previous packages list? [y/N]")
+      
+    if not answer.upper() == "Y":
+       print("Clean-up of files in cache canceled")
+       exit()
+    
     for pkg in packages:
         assert isinstance(pkg, PkgFile)
         print("deleting... " + pkg.__str__())
@@ -167,7 +212,7 @@ def remove_packages(packages):
             os.remove(pkg.fullpath)
         except OSError as e:
             if e.errno == errno.EACCES:
-                print("You don't have premissions to delete this file. Run as Root?")
+                print("You don't have permissions to delete this file. Run as Root?")
                 exit()
 
 if __name__ == "__main__":
@@ -178,8 +223,9 @@ if __name__ == "__main__":
     parser.add_argument('--morethan', '-m', action = 'store_true', help='list packages that has more than the specified number of files in the cache')
 
     # OPTIONAL ARGUMENTS
-    parser.add_argument('--delete', action = 'store_true', help='if this option is set, the packages listed by "uninstalled" or "morethan" is deleted.')
-    parser.add_argument('--number', '-n', metavar='n', type=int, default=NR_OF_PKG, help='number of packages that you want to keep as a backup. Defaults to 2.')
+    parser.add_argument('--delete', action = 'store_true', help='if this option is set, the packages listed by "uninstalled" or "morethan" are deleted. Confirmation could be required according the default value set for ''Delete_Confirmation'' in config file')
+    parser.add_argument('--no-confirm', action = 'store_true', help='if this option is set with --delete, the packages listed by "uninstalled" or "morethan" are deleted without confirmation. No effect if the config file is stored with ''Delete_Confirmation = No''')
+    parser.add_argument('--number', '-n', metavar='n', type=int, default=NR_OF_PKG, help='number of packages that you want to keep as a backup. Defaults to 2, this value can be changed in pacleaner_config file.')
     parser.add_argument('--cache_path', '-c', metavar='PATH', type=str, default=PACKAGES, help='optional path to pacman\'s cache')
     parser.add_argument('--installed_path', '-i', metavar='PATH', type=str, default=INSTALLED, help='optional path to pacman\'s installed package db')
 
@@ -187,7 +233,7 @@ if __name__ == "__main__":
 
     if not (args.uninstalled or args.morethan):
         parser.error("Need to specify -u, -t or both")
-    
+   
     installed = InstalledPkgList(args.installed_path)
     pkgfiles = PkgFileList(args.cache_path)
     old = older_than(pkgfiles, installed, args.number)
@@ -201,7 +247,7 @@ if __name__ == "__main__":
 
     else:
         if args.uninstalled:
-            remove_packages(uninstalled)
+            remove_packages(uninstalled, args.no_confirm)
         if args.morethan:
             old_files = find_files(old, pkgfiles)
-            remove_packages(old_files)
+            remove_packages(old_files, args.no_confirm)
