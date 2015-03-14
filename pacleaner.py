@@ -5,8 +5,10 @@ import sys
 import errno
 import argparse
 import configparser
-from operator import attrgetter
 import subprocess
+from operator import attrgetter
+from hurry.filesize import size
+import pdb
 
 config = configparser.ConfigParser()
 
@@ -31,7 +33,7 @@ class Package(object):
     '''base class for all kinds of packages, installed or package files'''
 
     def __str__(self):
-        return self.name + "-" + self.version + "-" + str (self.pkg_version)
+        return self.name + "-" + self.version + "-" + self.pkg_version
     
     def __repr__(self):
         return repr((self.name, self.version, self.pkg_version, self.arch))
@@ -69,9 +71,9 @@ class PkgFile(Package):
     def __init__(self, filename, path):
         self.filename = filename
         self.fullpath = os.path.join(path, filename)
-        self.name, self.version, pkg_ver, rest = filename.rsplit('-', 3)
-        self.pkg_version = float (pkg_ver)
+        self.name, self.version, self.pkg_version, rest = filename.rsplit('-', 3)
         self.arch, self.file_ext = rest.split('.',1)
+        self.pkg_size = os.path.getsize (self.fullpath)
 
 class InstalledPkg(Package):
     '''class for installed packages on the system'''
@@ -106,7 +108,7 @@ class PkgList(object):
                   current_pkg = self.pkg_list[i]
                   self.pkg_list[i] = self.pkg_list[j]
                   self.pkg_list[j] = current_pkg
-               j = j+1
+               j += 1
           
     def names(self):
         return [i.name for i in self.pkg_list ]
@@ -171,7 +173,7 @@ def older_than(pkgfiles, installed, number):
                             current_pkg = full_list[i]
                             full_list[i] = full_list[j]
                             full_list[j] = current_pkg
-                        j = j+1
+                        j += 1
                 for pkg in full_list[0:-number]:
                     result.append(pkg)
     return result
@@ -185,8 +187,11 @@ def find_files(packages, pkgfiles):
     return res
 
 def print_packages(packages):
-    for pkg in packages:
-        print(pkg)
+    disk_space = 0
+    for pkg in sorted (packages, key = attrgetter("name", "version", "pkg_version")):
+        print (pkg , "(%s)" % size(pkg.pkg_size))
+        disk_space += pkg.pkg_size
+    print ("%s of space will be free on the disk" % size(disk_space) )
 
 def print_installed(packages):
     for pkglist in packages:
@@ -205,7 +210,9 @@ def remove_packages(packages, confirmation):
        print("Clean-up of files in cache canceled")
        exit()
     
+    disk_space = 0
     for pkg in packages:
+        disk_space += pkg.pkg_size
         assert isinstance(pkg, PkgFile)
         print("deleting... " + pkg.__str__())
         try:
@@ -214,6 +221,7 @@ def remove_packages(packages, confirmation):
             if e.errno == errno.EACCES:
                 print("You don't have permissions to delete this file. Run as Root?")
                 exit()
+    print ("%s of space have been free on the disk" % size(disk_space) )            
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Clean up pacman\'s cache. More flexible than "pacman -Sc[c]"')
@@ -232,7 +240,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not (args.uninstalled or args.morethan):
-        parser.error("Need to specify -u, -t or both")
+        parser.error("Need to specify -u, -m or both")
    
     installed = InstalledPkgList(args.installed_path)
     pkgfiles = PkgFileList(args.cache_path)
