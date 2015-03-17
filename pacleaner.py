@@ -8,22 +8,46 @@ import configparser
 import subprocess
 from operator import attrgetter
 from hurry.filesize import size
-import pdb
+from collections import OrderedDict
 
-config = configparser.ConfigParser()
 
 username = os.getenv("SUDO_USER")
 if username is None:
    username = os.getenv("USER")
-   	
+
+class MultiOrderedDict(OrderedDict):
+     ''' Class defined to managed duplicate value in ConfigParser.'''
+     ''' See : http://stackoverflow.com/questions/15848674/how-to-configparse-a-file-keeping-multiple-values-for-identical-keys'''
+     def __setitem__(self, key, value):
+        if isinstance(value, list) and key in self:
+            self[key].extend(value)
+        else:
+            super(OrderedDict, self).__setitem__(key, value)
+
+config = configparser.RawConfigParser(dict_type = MultiOrderedDict,allow_no_value=True,strict=False)
+
+config.read('/etc/pacman.conf')
+
+try:
+  INSTALLED = os.path.join(config.get('options', 'DBPath')[0],'local/')
+except KeyError:
+  INSTALLED = '/var/lib/pacman/local/'
+
+try:
+  PACKAGES=[]
+  for key in config.get('options', 'CacheDir'):
+     for value in key.split():
+        PACKAGES.append(value)
+except KeyError:
+  PACKAGES = ['/var/cache/pacman/pkg/']
+
+config = configparser.ConfigParser()   	
 config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
 try:
-  PACKAGES = config['DEFAULT']['Cache_Path']
+  NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
 except KeyError:
   config.read(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'pacleaner_config'))
-  PACKAGES = config['DEFAULT']['Cache_Path']
    
-INSTALLED = config['DEFAULT']['Installed_Path']
 NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
 SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
 EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip"]
@@ -129,12 +153,13 @@ class PkgList(object):
 
 class PkgFileList(PkgList):
      
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, paths):
+        self.paths = paths
         self.pkg_list = []
-        filelist = [ f for f in os.listdir(path) if f.endswith(tuple(EXTENSIONS)) ]
-        for f in filelist:
-            self.pkg_list.append(PkgFile(f, path))
+        for path in paths:
+           filelist = [ f for f in os.listdir(path) if f.endswith(tuple(EXTENSIONS)) ]
+           for f in filelist:
+              self.pkg_list.append(PkgFile(f, path))
 
 class InstalledPkgList(PkgList):
 
@@ -211,10 +236,10 @@ def remove_packages(packages, confirmation):
        exit()
     
     disk_space = 0
-    for pkg in packages:
+    for pkg in sorted (packages, key = attrgetter("name", "version", "pkg_version")):
         disk_space += pkg.pkg_size
         assert isinstance(pkg, PkgFile)
-        print("deleting... " + pkg.__str__())
+        print("deleting... " + pkg.__str__() + " (%s)" % size(pkg.pkg_size))
         try:
             os.remove(pkg.fullpath)
         except OSError as e:
@@ -234,7 +259,7 @@ if __name__ == "__main__":
     parser.add_argument('--delete', action = 'store_true', help='if this option is set, the packages listed by "uninstalled" or "morethan" are deleted. Confirmation could be required according the default value set for ''Delete_Confirmation'' in config file')
     parser.add_argument('--no-confirm', action = 'store_true', help='if this option is set with --delete, the packages listed by "uninstalled" or "morethan" are deleted without confirmation. No effect if the config file is stored with ''Delete_Confirmation = No''')
     parser.add_argument('--number', '-n', metavar='n', type=int, default=NR_OF_PKG, help='number of packages that you want to keep as a backup. Defaults to 2, this value can be changed in pacleaner_config file.')
-    parser.add_argument('--cache_path', '-c', metavar='PATH', type=str, default=PACKAGES, help='optional path to pacman\'s cache')
+    parser.add_argument('--cache_path', '-c', metavar='PATH', type=list, default=PACKAGES, help='optional path to pacman\'s cache')
     parser.add_argument('--installed_path', '-i', metavar='PATH', type=str, default=INSTALLED, help='optional path to pacman\'s installed package db')
 
     args = parser.parse_args()
