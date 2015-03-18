@@ -25,27 +25,17 @@ class MultiOrderedDict(OrderedDict):
             super(OrderedDict, self).__setitem__(key, value)
 
 config = configparser.RawConfigParser(dict_type = MultiOrderedDict,allow_no_value=True,strict=False)
-
 config.read('/etc/pacman.conf')
+INSTALLED = os.path.join(config.get('options', 'DBPath', fallback=['/var/lib/pacman/'])[0],'local/')
+PACKAGES=[]
+for key in config.get('options', 'CacheDir', fallback = ['/var/cache/pacman/pkg/']):
+   for value in key.split():
+      PACKAGES.append(value)
 
-try:
-  INSTALLED = os.path.join(config.get('options', 'DBPath')[0],'local/')
-except KeyError:
-  INSTALLED = '/var/lib/pacman/local/'
-
-try:
-  PACKAGES=[]
-  for key in config.get('options', 'CacheDir'):
-     for value in key.split():
-        PACKAGES.append(value)
-except KeyError:
-  PACKAGES = ['/var/cache/pacman/pkg/']
-
-config = configparser.ConfigParser()   	
-config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
-try:
-  NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
-except KeyError:
+config = configparser.ConfigParser()
+if os.path.isfile (os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config')): 	
+   config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
+else:
   config.read(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'pacleaner_config'))
    
 NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
