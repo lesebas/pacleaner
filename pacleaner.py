@@ -33,11 +33,11 @@ for key in config.get('options', 'CacheDir', fallback = ['/var/cache/pacman/pkg/
       PACKAGES.append(value)
 
 config = configparser.ConfigParser()
-if os.path.isfile (os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config')): 	
+if os.path.isfile (os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config')):
    config.read(os.path.join(os.path.expanduser('~'+username+'/'), '.config/pacleaner/pacleaner_config'))
 else:
   config.read(os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'pacleaner_config'))
-   
+
 NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
 SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
 EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip"]
@@ -48,7 +48,7 @@ class Package(object):
 
     def __str__(self):
         return self.name + "-" + self.version + "-" + self.pkg_version
-    
+
     def __repr__(self):
         return repr((self.name, self.version, self.pkg_version, self.arch))
 
@@ -69,7 +69,7 @@ class Package(object):
                 return self.version < other.version
         else:
             return self.name < other.name
-                    
+
     def __le__(self, other):
         return self.__eq__(other) or self.__lt__(other)
 
@@ -115,7 +115,7 @@ class PkgList(object):
     def sort_by_ver(self):
         self.pkg_list = sorted(self.pkg_list, key = attrgetter("name"))
         for i in range(len(self.pkg_list)-2):
-           j = i+1 	   
+           j = i+1
            while self.pkg_list[j].name == self.pkg_list[i].name:
                compare_code = subprocess.check_output(['vercmp' , self.pkg_list[j].fullpath , self.pkg_list[i].fullpath])
                if int(compare_code)<0 :
@@ -123,7 +123,7 @@ class PkgList(object):
                   self.pkg_list[i] = self.pkg_list[j]
                   self.pkg_list[j] = current_pkg
                j += 1
-          
+
     def names(self):
         return [i.name for i in self.pkg_list ]
 
@@ -142,7 +142,7 @@ class PkgList(object):
         return result
 
 class PkgFileList(PkgList):
-     
+
     def __init__(self, paths):
         self.paths = paths
         self.pkg_list = []
@@ -181,7 +181,7 @@ def older_than(pkgfiles, installed, number):
         if(len(full_list) > number):
             if len(full_list[0:-number]) > 0:
                 for i in range(len(full_list)-1):
-                    j = i+1 	   
+                    j = i+1
                     while j < len(full_list):
                         compare_code = subprocess.check_output(['vercmp' , full_list[j].fullpath , full_list[i].fullpath])
                         if int(compare_code)<0 :
@@ -216,15 +216,15 @@ def print_installed(packages):
 def remove_packages(packages, confirmation):
     if (not(SECURE_DELETE) or confirmation):
       answer = "Y"
-      
+
     else:
       print_packages(packages)
       answer = input ("Are you sure you want to clean-up the pacman cache directory according the previous packages list? [y/N]")
-      
+
     if not answer.upper() == "Y":
        print("Clean-up of files in cache canceled")
        exit()
-    
+
     disk_space = 0
     for pkg in sorted (packages, key = attrgetter("name", "version", "pkg_version")):
         disk_space += pkg.pkg_size
@@ -236,7 +236,7 @@ def remove_packages(packages, confirmation):
             if e.errno == errno.EACCES:
                 print("You don't have permissions to delete this file. Run as Root?")
                 exit()
-    print ("%s of space have been free on the disk" % size(disk_space) )            
+    print ("%s of space have been free on the disk" % size(disk_space) )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Clean up pacman\'s cache. More flexible than "pacman -Sc[c]"')
@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     if not (args.uninstalled or args.morethan):
         parser.error("Need to specify -u, -m or both")
-   
+
     installed = InstalledPkgList(args.installed_path)
     pkgfiles = PkgFileList(args.cache_path)
     old = older_than(pkgfiles, installed, args.number)
