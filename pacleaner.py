@@ -249,7 +249,7 @@ if __name__ == "__main__":
     parser.add_argument('--delete', action = 'store_true', help='if this option is set, the packages listed by "uninstalled" or "morethan" are deleted. Confirmation could be required according the default value set for ''Delete_Confirmation'' in config file')
     parser.add_argument('--no-confirm', action = 'store_true', help='if this option is set with --delete, the packages listed by "uninstalled" or "morethan" are deleted without confirmation. No effect if the config file is stored with ''Delete_Confirmation = No''')
     parser.add_argument('--number', '-n', metavar='n', type=int, default=NR_OF_PKG, help='number of packages that you want to keep as a backup. Defaults to 2, this value can be changed in pacleaner_config file.')
-    parser.add_argument('--cache_path', '-c', metavar='PATH', type=list, default=PACKAGES, help='optional path to pacman\'s cache')
+    parser.add_argument('--cache_path', '-c', metavar='PATH', type=str, nargs="+", default=PACKAGES, help='optional path to pacman\'s cache')
     parser.add_argument('--installed_path', '-i', metavar='PATH', type=str, default=INSTALLED, help='optional path to pacman\'s installed package db')
 
     args = parser.parse_args()
