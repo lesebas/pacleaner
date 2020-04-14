@@ -1,0 +1,4 @@
+[DEFAULT]
+
+Nb_Of_Pkg_Keep = 3
+Delete_Confirmation = Yes
