@@ -40,7 +40,7 @@ else:
 
 NR_OF_PKG = int(config['DEFAULT']['Nb_Of_Pkg_Keep'])
 SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
-EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip" , "pkg.tar.zst"]
+EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip" , "pkg.tar.zst", "pkg.tar.zst.sig"]
 ARCHES = ["any", "x86_64", "i686"]
 
 class Package(object):
