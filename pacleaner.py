@@ -199,10 +199,15 @@ def older_than(pkgfiles, installed, number):
     result = []
     for pkg in installed.unique():
         full_list = pkgfiles.get_by_name(pkg)
+
+        # each key of version_dict is a version string
+        # each value is a list of the package files with that version
+        # (in particular, including both .zstd and .zstd.sig files)
         version_dict = {}
         for p in full_list:
             version_dict[p.version] = version_dict.get(p.version, []) + [p]
         version_list = list(version_dict.keys())
+
         if (len(version_dict) > number):
             version_list = sorted(version_list, key=vercmp_key)
             for ver in version_list[0:-number]:
