@@ -202,7 +202,7 @@ def older_than(pkgfiles, installed, number):
 
         # each key of version_dict is a version string
         # each value is a list of the package files with that version
-        # (in particular, including both .zstd and .zstd.sig files)
+        # (in particular, including both .zst and .zst.sig files)
         version_dict = {}
         for p in full_list:
             version_dict[p.version] = version_dict.get(p.version, []) + [p]
