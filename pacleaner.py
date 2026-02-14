@@ -45,12 +45,12 @@ EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip" , "pkg.tar.zst", "pkg.tar.zst.sig"]
 ARCHES = ["any", "x86_64", "i686"]
 
 
-# Function for sorting version strings
+# Comparison function for sorting version strings
 def vercmp_func(v1, v2):
     return int(subprocess.check_output(['vercmp', v1, v2]))
 vercmp_key = cmp_to_key(vercmp_func)
 
-# Function for sorting package by name, version, and extension
+# Comparison function for sorting package by name, version, and extension
 def pkgcmp_func(pkg1, pkg2):
     if pkg1.name < pkg2.name:
         return -1
