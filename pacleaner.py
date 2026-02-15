@@ -9,6 +9,7 @@ import subprocess
 from operator import attrgetter
 from hurry.filesize import size
 from collections import OrderedDict
+from functools import cmp_to_key
 
 
 username = os.getenv("SUDO_USER")
@@ -43,6 +44,35 @@ SECURE_DELETE = config.getboolean('DEFAULT' , 'Delete_Confirmation')
 EXTENSIONS = ["pkg.tar.xz", "pkg.tar.gzip" , "pkg.tar.zst", "pkg.tar.zst.sig"]
 ARCHES = ["any", "x86_64", "i686"]
 
+
+# Comparison function for sorting version strings
+def vercmp_func(v1, v2):
+    return int(subprocess.check_output(['vercmp', v1, v2]))
+vercmp_key = cmp_to_key(vercmp_func)
+
+# Comparison function for sorting package by name, version, and extension
+def pkgcmp_func(pkg1, pkg2):
+    if pkg1.name < pkg2.name:
+        return -1
+    if pkg1.name > pkg2.name:
+        return 1
+
+    ver_sort_val = 0
+    if pkg1.version != pkg2.version:
+        ver_sort_val = vercmp_func(pkg1.version, pkg2.version)
+    if ver_sort_val != 0:
+        return ver_sort_val
+
+    if hasattr(pkg1, "file_ext") and hasattr(pkg2, "file_ext"):
+        if pkg1.file_ext < pkg2.file_ext:
+            return -1
+        if pkg1.file_ext > pkg2.file_ext:
+            return 1
+
+    return 0
+
+pkgcmp_key = cmp_to_key(pkgcmp_func)
+
 class Package(object):
     '''base class for all kinds of packages, installed or package files'''
 
@@ -60,15 +90,7 @@ class Package(object):
        return not self.__eq__(other)
 
     def __lt__(self, other):
-        if self.__eq__(other):
-            return false
-        elif self.name == other.name:
-            if self.version == other.version:
-                return self.pkg_version < other.pkg_version
-            else:
-                return self.version < other.version
-        else:
-            return self.name < other.name
+        return pkgcmp_func(self, other) == -1
 
     def __le__(self, other):
         return self.__eq__(other) or self.__lt__(other)
@@ -175,22 +197,21 @@ def uninstalled_packages(pkgfiles, installed):
 
 def older_than(pkgfiles, installed, number):
     result = []
-    #pkgfiles.sort_by_ver()
     for pkg in installed.unique():
         full_list = pkgfiles.get_by_name(pkg)
-        if(len(full_list) > number):
-            if len(full_list[0:-number]) > 0:
-                for i in range(len(full_list)-1):
-                    j = i+1
-                    while j < len(full_list):
-                        compare_code = subprocess.check_output(['vercmp' , full_list[j].fullpath , full_list[i].fullpath])
-                        if int(compare_code)<0 :
-                            current_pkg = full_list[i]
-                            full_list[i] = full_list[j]
-                            full_list[j] = current_pkg
-                        j += 1
-                for pkg in full_list[0:-number]:
-                    result.append(pkg)
+
+        # each key of version_dict is a version string
+        # each value is a list of the package files with that version
+        # (in particular, including both .zst and .zst.sig files)
+        version_dict = {}
+        for p in full_list:
+            version_dict[p.version] = version_dict.get(p.version, []) + [p]
+        version_list = list(version_dict.keys())
+
+        if (len(version_dict) > number):
+            version_list = sorted(version_list, key=vercmp_key)
+            for ver in version_list[0:-number]:
+                result += version_dict[ver]
     return result
 
 def find_files(packages, pkgfiles):
@@ -203,8 +224,8 @@ def find_files(packages, pkgfiles):
 
 def print_packages(packages):
     disk_space = 0
-    for pkg in sorted (packages, key = attrgetter("name", "version", "pkg_version")):
-        print (pkg , "(%s)" % size(pkg.pkg_size))
+    for pkg in sorted (packages, key = attrgetter("name", "version", "pkg_version", "file_ext")):
+        print (pkg, "(%s)" % pkg.file_ext.split("pkg.tar.")[-1], "(%s)" % size(pkg.pkg_size))
         disk_space += pkg.pkg_size
     print ("%s of space will be free on the disk" % size(disk_space) )
 
